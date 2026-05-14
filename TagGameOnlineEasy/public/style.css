@@ -88,7 +88,7 @@ button:hover {
 
 #game {
   min-height: 100dvh;
-  padding-bottom: 120px;
+  padding-bottom: 170px;
 }
 
 .top {
@@ -121,7 +121,7 @@ button:hover {
   display: block;
   width: min(100vw, 1400px);
   height: auto;
-  max-height: calc(100dvh - 175px);
+  max-height: calc(100dvh - 210px);
   margin: 8px auto 0;
   background: #80d84c;
   border: 4px solid #333;
@@ -131,23 +131,26 @@ button:hover {
 
 .mobileControls {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
   bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateX(-50%);
   z-index: 50;
+
+  width: min(760px, 92vw);
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 10px;
-  justify-content: center;
-  padding: 10px 12px;
+
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.15));
+  border-radius: 26px 26px 0 0;
   pointer-events: none;
 }
 
 .mobileControls button {
   pointer-events: auto;
-  height: 72px;
-  max-width: 220px;
-  flex: 1;
+  height: 64px;
   font-size: 38px;
   line-height: 1;
   border-radius: 22px;
@@ -156,8 +159,19 @@ button:hover {
   -webkit-user-select: none;
 }
 
-.mobileControls .jump {
+#jumpBtn {
+  width: 42%;
   background: #68b8ff;
+}
+
+.sideArrows {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+
+.sideArrows button {
+  flex: 1;
 }
 
 .help {
@@ -177,7 +191,7 @@ button:hover {
   #game {
     height: 100dvh;
     overflow: hidden;
-    padding-bottom: 94px;
+    padding-bottom: 150px;
   }
 
   .top {
@@ -198,21 +212,26 @@ button:hover {
 
   #c {
     width: 100vw;
-    max-height: calc(100dvh - 145px);
+    max-height: calc(100dvh - 185px);
     margin-top: 4px;
     border-left: 0;
     border-right: 0;
   }
 
   .mobileControls {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    width: min(620px, 94vw);
     gap: 8px;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .mobileControls button {
-    height: 64px;
+    height: 58px;
     font-size: 34px;
     border-radius: 18px;
+  }
+
+  #jumpBtn {
+    width: 42%;
   }
 
   .help {
@@ -238,39 +257,47 @@ button:hover {
   }
 
   #c {
-    max-height: calc(100dvh - 135px);
+    max-height: calc(100dvh - 175px);
   }
 
   .mobileControls button {
-    height: 58px;
+    height: 54px;
     font-size: 30px;
+  }
+
+  #jumpBtn {
+    width: 50%;
   }
 }
 
 /* Landscape phone/tablet */
 @media (max-height: 520px) and (orientation: landscape) {
+  #game {
+    padding-bottom: 110px;
+  }
+
   .top {
     padding: 5px 8px;
   }
 
   #c {
-    max-height: calc(100dvh - 88px);
+    max-height: calc(100dvh - 145px);
     width: auto;
   }
 
   .mobileControls {
-    background: transparent;
-    justify-content: space-between;
-    padding: 0 18px 10px;
+    width: min(560px, 82vw);
+    background: rgba(0, 0, 0, 0.35);
+    padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
   .mobileControls button {
-    height: 58px;
-    max-width: 150px;
-    opacity: 0.82;
+    height: 45px;
+    font-size: 26px;
+    opacity: 0.9;
   }
 
-  .mobileControls .jump {
-    max-width: 170px;
+  #jumpBtn {
+    width: 38%;
   }
 }
