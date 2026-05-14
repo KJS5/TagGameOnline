@@ -5,397 +5,398 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: {
-    origin: "*"
-  }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
+app.get("/health", (_, res) => {
+  res.send("ok");
 });
 
-const rooms = {};
+const W = 960;
+const H = 600;
 
-function makeRoomCode() {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+const platforms = [
+  { x: 0, y: 560, w: 960, h: 40 },
+  { x: 85, y: 450, w: 235, h: 22 },
+  { x: 410, y: 450, w: 235, h: 22 },
+  { x: 735, y: 450, w: 170, h: 22 },
+  { x: 160, y: 330, w: 220, h: 22 },
+  { x: 510, y: 330, w: 250, h: 22 },
+  { x: 330, y: 220, w: 300, h: 22 },
+  { x: 55, y: 150, w: 180, h: 22 },
+  { x: 730, y: 150, w: 180, h: 22 }
+];
+
+const rooms = new Map();
+
+const colors = ["#2196f3", "#ff3b30", "#ffd60a", "#af52de"];
+
+const spawns = [
+  { x: 120, y: 515 },
+  { x: 800, y: 515 },
+  { x: 205, y: 285 },
+  { x: 710, y: 285 }
+];
+
+function makeCode() {
+  let c;
+
+  do {
+    c = String(Math.floor(1000 + Math.random() * 9000));
+  } while (rooms.has(c));
+
+  return c;
 }
 
-function getPublicRoom(roomCode) {
-  const room = rooms[roomCode];
-  if (!room) return null;
-
+function publicRoom(r) {
   return {
-    code: room.code,
-    players: room.players,
-    taggerId: room.taggerId,
-    timeLeft: room.timeLeft,
-    gameStarted: room.gameStarted
+    code: r.code,
+    host: r.host,
+    started: r.started,
+    time: Math.max(0, Math.ceil(r.time)),
+    taggerId: r.taggerId,
+    players: r.players,
+    message: r.message
   };
 }
 
-function createPlayer(playerId, name) {
-  const spawnPoints = [
-    { x: 120, y: 430 },
-    { x: 650, y: 430 },
-    { x: 260, y: 220 },
-    { x: 520, y: 120 }
-  ];
-
-  const spawn = spawnPoints[playerId - 1];
+function newPlayer(id, name) {
+  const s = spawns[id - 1];
 
   return {
-    id: playerId,
-    name: name || `Player ${playerId}`,
-    x: spawn.x,
-    y: spawn.y,
+    id,
+    name: (name || `P${id}`).slice(0, 12),
+    x: s.x,
+    y: s.y,
+    w: 34,
+    h: 34,
     vx: 0,
     vy: 0,
-    width: 32,
-    height: 32,
-    onGround: false,
-
-    // DOUBLE JUMP SETTINGS
-    jumpsUsed: 0,
-    maxJumps: 2,
-
     left: false,
     right: false,
     jump: false,
-    color: ["#1e90ff", "#ff3333", "#ffd12a", "#b14cff"][playerId - 1],
-    connected: true
+    ground: false,
+
+    // Double jump
+    jumpsUsed: 0,
+    maxJumps: 2,
+
+    color: colors[id - 1],
+    score: 0
   };
 }
 
-function startGame(roomCode) {
-  const room = rooms[roomCode];
-  if (!room) return;
-
-  const playerIds = Object.keys(room.players).map(Number);
-  if (playerIds.length < 2) return;
-
-  room.gameStarted = true;
-  room.timeLeft = 120;
-  room.taggerId = playerIds[Math.floor(Math.random() * playerIds.length)];
-  room.lastTick = Date.now();
-
-  io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
+function overlap(a, b) {
+  return (
+    a.x < b.x + b.w &&
+    a.x + a.w > b.x &&
+    a.y < b.y + b.h &&
+    a.y + a.h > b.y
+  );
 }
 
-function resetRoom(roomCode) {
-  const room = rooms[roomCode];
-  if (!room) return;
+function collidePlatform(p, dt) {
+  p.ground = false;
 
-  const oldPlayers = Object.values(room.players);
+  for (const pl of platforms) {
+    if (!overlap(p, pl)) continue;
 
-  room.players = {};
-  oldPlayers.forEach((oldPlayer, index) => {
-    const id = index + 1;
-    room.players[id] = createPlayer(id, oldPlayer.name);
-    room.players[id].connected = oldPlayer.connected;
+    const oldBottom = p.y + p.h - p.vy * dt;
+    const oldTop = p.y - p.vy * dt;
+    const oldRight = p.x + p.w - p.vx * dt;
+    const oldLeft = p.x - p.vx * dt;
+
+    if (oldBottom <= pl.y && p.vy >= 0) {
+      p.y = pl.y - p.h;
+      p.vy = 0;
+      p.ground = true;
+      p.jumpsUsed = 0;
+    } else if (oldTop >= pl.y + pl.h && p.vy < 0) {
+      p.y = pl.y + pl.h;
+      p.vy = 0;
+    } else if (oldRight <= pl.x && p.vx > 0) {
+      p.x = pl.x - p.w;
+      p.vx = 0;
+    } else if (oldLeft >= pl.x + pl.w && p.vx < 0) {
+      p.x = pl.x + pl.w;
+      p.vx = 0;
+    }
+  }
+}
+
+function resetPositions(r) {
+  Object.values(r.players).forEach((p) => {
+    const s = spawns[p.id - 1];
+
+    p.x = s.x;
+    p.y = s.y;
+    p.vx = 0;
+    p.vy = 0;
+    p.left = false;
+    p.right = false;
+    p.jump = false;
+    p.ground = false;
+    p.jumpsUsed = 0;
   });
+}
 
-  room.taggerId = null;
-  room.timeLeft = 120;
-  room.gameStarted = false;
-  room.lastTagTime = 0;
-  room.lastTick = Date.now();
+function startRoom(r) {
+  const ids = Object.keys(r.players).map(Number);
 
-  io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
+  if (ids.length < 2) {
+    r.message = "Need at least 2 players.";
+    return;
+  }
+
+  resetPositions(r);
+
+  r.started = true;
+  r.time = 90;
+  r.lastTag = 0;
+  r.message = "";
+  r.taggerId = ids[Math.floor(Math.random() * ids.length)];
+  r.last = Date.now();
 }
 
 io.on("connection", (socket) => {
-  socket.on("hostCreateRoom", () => {
-    let roomCode = makeRoomCode();
+  socket.on("createRoom", ({ name }) => {
+    const c = makeCode();
 
-    while (rooms[roomCode]) {
-      roomCode = makeRoomCode();
-    }
-
-    rooms[roomCode] = {
-      code: roomCode,
-      hostSocketId: socket.id,
+    const r = {
+      code: c,
+      host: socket.id,
+      started: false,
+      time: 90,
+      taggerId: 1,
+      last: Date.now(),
+      lastTag: 0,
       players: {},
-      socketToPlayer: {},
-      taggerId: null,
-      timeLeft: 120,
-      gameStarted: false,
-      lastTick: Date.now(),
-      lastTagTime: 0
+      sockets: {},
+      message: ""
     };
 
-    socket.join(roomCode);
+    r.players[1] = newPlayer(1, name || "Host");
+    r.sockets[socket.id] = 1;
 
-    socket.emit("hostRoomCreated", {
-      roomCode
+    rooms.set(c, r);
+
+    socket.join(c);
+    socket.data.room = c;
+
+    socket.emit("joined", {
+      code: c,
+      playerId: 1
     });
 
-    io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
+    io.to(c).emit("state", publicRoom(r));
   });
 
-  socket.on("hostJoinRoom", ({ roomCode }) => {
-    const room = rooms[roomCode];
+  socket.on("joinRoom", ({ code, name }) => {
+    const c = String(code || "").trim();
+    const r = rooms.get(c);
 
-    if (!room) {
-      socket.emit("errorMessage", "Room not found.");
+    if (!r) {
+      socket.emit("errorMsg", "Room not found");
       return;
     }
 
-    room.hostSocketId = socket.id;
-    socket.join(roomCode);
-
-    socket.emit("hostRoomCreated", {
-      roomCode
-    });
-
-    socket.emit("roomState", getPublicRoom(roomCode));
-  });
-
-  socket.on("controllerJoin", ({ roomCode, name }) => {
-    const room = rooms[roomCode];
-
-    if (!room) {
-      socket.emit("joinFailed", "Room not found.");
+    if (r.started) {
+      socket.emit("errorMsg", "Game already started");
       return;
     }
 
-    if (room.gameStarted) {
-      socket.emit("joinFailed", "Game already started.");
-      return;
-    }
-
-    const usedIds = Object.keys(room.players).map(Number);
-    let playerId = null;
+    let id = null;
 
     for (let i = 1; i <= 4; i++) {
-      if (!usedIds.includes(i)) {
-        playerId = i;
+      if (!r.players[i]) {
+        id = i;
         break;
       }
     }
 
-    if (!playerId) {
-      socket.emit("joinFailed", "Room is full.");
+    if (!id) {
+      socket.emit("errorMsg", "Room is full");
       return;
     }
 
-    room.players[playerId] = createPlayer(playerId, name);
-    room.socketToPlayer[socket.id] = playerId;
+    r.players[id] = newPlayer(id, name || `Player ${id}`);
+    r.sockets[socket.id] = id;
 
-    socket.join(roomCode);
+    socket.join(c);
+    socket.data.room = c;
 
-    socket.emit("controllerJoined", {
-      roomCode,
-      playerId,
-      color: room.players[playerId].color
+    socket.emit("joined", {
+      code: c,
+      playerId: id
     });
 
-    io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
+    io.to(c).emit("state", publicRoom(r));
   });
 
-  socket.on("startGame", ({ roomCode }) => {
-    const room = rooms[roomCode];
+  socket.on("startGame", () => {
+    const r = rooms.get(socket.data.room);
 
-    if (!room) return;
-    if (socket.id !== room.hostSocketId) return;
+    if (!r) return;
+    if (r.host !== socket.id) return;
 
-    startGame(roomCode);
+    startRoom(r);
+    io.to(r.code).emit("state", publicRoom(r));
   });
 
-  socket.on("resetGame", ({ roomCode }) => {
-    const room = rooms[roomCode];
+  socket.on("restart", () => {
+    const r = rooms.get(socket.data.room);
 
-    if (!room) return;
-    if (socket.id !== room.hostSocketId) return;
+    if (!r) return;
+    if (r.host !== socket.id) return;
 
-    resetRoom(roomCode);
+    r.started = false;
+    r.time = 90;
+    r.message = "";
+
+    resetPositions(r);
+
+    io.to(r.code).emit("state", publicRoom(r));
   });
 
-  socket.on("control", ({ roomCode, playerId, input, pressed }) => {
-    const room = rooms[roomCode];
-    if (!room) return;
+  socket.on("input", ({ key, down }) => {
+    const r = rooms.get(socket.data.room);
+    if (!r) return;
 
-    const player = room.players[playerId];
-    if (!player) return;
+    const id = r.sockets[socket.id];
+    const p = r.players[id];
+    if (!p) return;
 
-    if (input === "left") {
-      player.left = pressed;
+    if (key === "left") {
+      p.left = !!down;
     }
 
-    if (input === "right") {
-      player.right = pressed;
+    if (key === "right") {
+      p.right = !!down;
     }
 
-    if (input === "jump") {
-      if (pressed && !player.jump && player.jumpsUsed < player.maxJumps) {
-        player.vy = -560;
-        player.onGround = false;
-        player.jumpsUsed++;
+    if (key === "jump") {
+      if (down && !p.jump && p.jumpsUsed < p.maxJumps) {
+        p.vy = -610;
+        p.ground = false;
+        p.jumpsUsed++;
       }
 
-      player.jump = pressed;
+      p.jump = !!down;
     }
   });
 
   socket.on("disconnect", () => {
-    for (const roomCode of Object.keys(rooms)) {
-      const room = rooms[roomCode];
-      const playerId = room.socketToPlayer[socket.id];
+    const r = rooms.get(socket.data.room);
+    if (!r) return;
 
-      if (playerId && room.players[playerId]) {
-        room.players[playerId].connected = false;
-        room.players[playerId].left = false;
-        room.players[playerId].right = false;
-        room.players[playerId].jump = false;
+    const id = r.sockets[socket.id];
 
-        io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
-      }
+    delete r.sockets[socket.id];
 
-      delete room.socketToPlayer[socket.id];
-
-      const noHost = room.hostSocketId === socket.id;
-      const noPlayers = Object.values(room.players).every((p) => !p.connected);
-
-      if (noHost && noPlayers) {
-        delete rooms[roomCode];
-      }
+    if (id) {
+      delete r.players[id];
     }
+
+    const ids = Object.keys(r.players).map(Number);
+
+    if (!ids.length) {
+      rooms.delete(r.code);
+      return;
+    }
+
+    if (r.host === socket.id) {
+      r.host = Object.keys(r.sockets)[0];
+    }
+
+    if (!r.players[r.taggerId]) {
+      r.taggerId = ids[0];
+    }
+
+    if (ids.length < 2) {
+      r.started = false;
+    }
+
+    io.to(r.code).emit("state", publicRoom(r));
   });
 });
 
-const platforms = [
-  { x: 90, y: 480, w: 680, h: 28 },
-  { x: 160, y: 300, w: 520, h: 25 },
-  { x: 320, y: 165, w: 320, h: 25 },
-  { x: 45, y: 130, w: 175, h: 25 },
-  { x: 700, y: 190, w: 180, h: 25 },
-  { x: 0, y: 560, w: 900, h: 40 }
-];
-
-function rectsOverlap(a, b) {
-  return (
-    a.x < b.x + b.w &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.h &&
-    a.y + a.height > b.y
-  );
-}
-
-function playerOverlap(a, b) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
-}
-
-function updateRoom(roomCode) {
-  const room = rooms[roomCode];
-  if (!room || !room.gameStarted) return;
-
+setInterval(() => {
   const now = Date.now();
-  const dt = Math.min((now - room.lastTick) / 1000, 0.05);
-  room.lastTick = now;
 
-  room.timeLeft -= dt;
-
-  if (room.timeLeft <= 0) {
-    room.timeLeft = 0;
-    room.gameStarted = false;
-
-    io.to(roomCode).emit("gameOver", {
-      loserId: room.taggerId
-    });
-
-    io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
-    return;
-  }
-
-  const players = Object.values(room.players);
-
-  for (const p of players) {
-    const speed = room.taggerId === p.id ? 245 : 225;
-    const gravity = 1500;
-
-    if (p.left && !p.right) {
-      p.vx = -speed;
-    } else if (p.right && !p.left) {
-      p.vx = speed;
-    } else {
-      p.vx = 0;
+  for (const r of rooms.values()) {
+    if (!r.started) {
+      io.to(r.code).emit("state", publicRoom(r));
+      continue;
     }
 
-    p.vy += gravity * dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
+    const dt = Math.min((now - r.last) / 1000, 0.04);
+    r.last = now;
+    r.time -= dt;
 
-    p.onGround = false;
+    if (r.time <= 0) {
+      r.started = false;
+      r.message = `Player ${r.taggerId} was IT and lost!`;
 
-    for (const platform of platforms) {
-      if (rectsOverlap(p, platform)) {
-        const previousBottom = p.y + p.height - p.vy * dt;
+      io.to(r.code).emit("state", publicRoom(r));
+      continue;
+    }
 
-        if (previousBottom <= platform.y && p.vy >= 0) {
-          p.y = platform.y - p.height;
-          p.vy = 0;
-          p.onGround = true;
+    for (const p of Object.values(r.players)) {
+      const speed = p.id === r.taggerId ? 250 : 230;
 
-          // RESET DOUBLE JUMP WHEN PLAYER LANDS
-          p.jumpsUsed = 0;
+      if (p.left && !p.right) {
+        p.vx = -speed;
+      } else if (p.right && !p.left) {
+        p.vx = speed;
+      } else {
+        p.vx = 0;
+      }
+
+      p.vy += 1750 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      collidePlatform(p, dt);
+
+      if (p.x < 0) {
+        p.x = 0;
+      }
+
+      if (p.x + p.w > W) {
+        p.x = W - p.w;
+      }
+
+      if (p.y > H + 100) {
+        const s = spawns[p.id - 1];
+
+        p.x = s.x;
+        p.y = 40;
+        p.vx = 0;
+        p.vy = 0;
+        p.ground = false;
+        p.jumpsUsed = 0;
+      }
+    }
+
+    const tagger = r.players[r.taggerId];
+
+    if (tagger && now - r.lastTag > 850) {
+      for (const p of Object.values(r.players)) {
+        if (p.id !== tagger.id && overlap(tagger, p)) {
+          r.taggerId = p.id;
+          r.lastTag = now;
+          break;
         }
       }
     }
 
-    if (p.x < 0) {
-      p.x = 0;
-    }
-
-    if (p.x + p.width > 900) {
-      p.x = 900 - p.width;
-    }
-
-    if (p.y > 620) {
-      p.x = 120 + p.id * 80;
-      p.y = 100;
-      p.vx = 0;
-      p.vy = 0;
-      p.onGround = false;
-      p.jumpsUsed = 0;
-    }
+    io.to(r.code).emit("state", publicRoom(r));
   }
-
-  const tagger = room.players[room.taggerId];
-
-  if (tagger && now - room.lastTagTime > 1000) {
-    for (const p of players) {
-      if (p.id !== tagger.id && playerOverlap(tagger, p)) {
-        room.taggerId = p.id;
-        room.lastTagTime = now;
-
-        io.to(roomCode).emit("tagChanged", {
-          taggerId: room.taggerId
-        });
-
-        break;
-      }
-    }
-  }
-
-  io.to(roomCode).emit("roomState", getPublicRoom(roomCode));
-}
-
-setInterval(() => {
-  for (const roomCode of Object.keys(rooms)) {
-    updateRoom(roomCode);
-  }
-}, 1000 / 60);
+}, 1000 / 30);
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Tag game running on port ${PORT}`);
+  console.log("Tag Game Online Easy running on port " + PORT);
 });
