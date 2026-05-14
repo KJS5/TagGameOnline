@@ -1,35 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Tag Game Online Easy</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="menu" class="panel">
-    <h1>Tag Game Online</h1>
-    <p>Make a room, send the code to friends, and play in the browser.</p>
-    <input id="name" maxlength="12" placeholder="Your name">
+    <h1>Tag Game</h1>
+
+    <input id="name" placeholder="Your name" maxlength="12" />
+
     <button id="create">Create Room</button>
-    <div class="joinLine"><input id="code" maxlength="4" placeholder="Room code"><button id="join">Join</button></div>
+
+    <div class="joinLine">
+      <input id="code" placeholder="Room code" maxlength="4" />
+      <button id="join">Join</button>
+    </div>
+
     <p id="err"></p>
+
+    <p class="menuHelp">
+      Make a room, send the code to friends, then press Start.
+    </p>
   </div>
 
   <div id="game" class="hidden">
     <div class="top">
-      <div><b>Room:</b> <span id="roomCode"></span> <button id="copy">Copy Link</button></div>
-      <div><b>You:</b> Player <span id="me"></span></div>
+      <div>
+        Room:
+        <b id="roomCode">----</b>
+      </div>
+
+      <div>
+        You are:
+        <b id="you">P?</b>
+      </div>
+
+      <div>
+        Time:
+        <b id="time">120</b>
+      </div>
+
+      <button id="copy">Copy Link</button>
       <button id="start">Start</button>
-      <button id="restart">Lobby</button>
+      <button id="restart">Restart</button>
     </div>
-    <canvas id="c" width="960" height="600"></canvas>
+
+    <canvas id="c" width="1400" height="750"></canvas>
+
     <div class="mobileControls">
-      <button data-k="left">LEFT</button>
-      <button data-k="jump" class="jump">JUMP</button>
-      <button data-k="right">RIGHT</button>
+      <button id="leftBtn" aria-label="Move left">◀</button>
+      <button id="jumpBtn" class="jump" aria-label="Jump">▲</button>
+      <button id="rightBtn" aria-label="Move right">▶</button>
     </div>
-    <p class="help">Keyboard: A/D or arrows to move, W/Space/Up to jump. On phone use buttons.</p>
+
+    <p class="help">
+      Keyboard: A/D or Arrow Keys to move — W/Space/Up to jump. Tablet: use arrows.
+    </p>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
