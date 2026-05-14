@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Tag Game Online Easy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="menu" class="panel">
+    <h1>Tag Game Online</h1>
+    <p>Make a room, send the code to friends, and play in the browser.</p>
+    <input id="name" maxlength="12" placeholder="Your name">
+    <button id="create">Create Room</button>
+    <div class="joinLine"><input id="code" maxlength="4" placeholder="Room code"><button id="join">Join</button></div>
+    <p id="err"></p>
+  </div>
+
+  <div id="game" class="hidden">
+    <div class="top">
+      <div><b>Room:</b> <span id="roomCode"></span> <button id="copy">Copy Link</button></div>
+      <div><b>You:</b> Player <span id="me"></span></div>
+      <button id="start">Start</button>
+      <button id="restart">Lobby</button>
+    </div>
+    <canvas id="c" width="960" height="600"></canvas>
+    <div class="mobileControls">
+      <button data-k="left">LEFT</button>
+      <button data-k="jump" class="jump">JUMP</button>
+      <button data-k="right">RIGHT</button>
+    </div>
+    <p class="help">Keyboard: A/D or arrows to move, W/Space/Up to jump. On phone use buttons.</p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
