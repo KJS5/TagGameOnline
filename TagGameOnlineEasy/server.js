@@ -15,19 +15,41 @@ app.get("/health", (_, res) => {
   res.send("ok");
 });
 
-const W = 960;
-const H = 600;
+// BIGGER MAP SIZE
+const W = 1400;
+const H = 750;
 
 const platforms = [
-  { x: 0, y: 560, w: 960, h: 40 },
-  { x: 85, y: 450, w: 235, h: 22 },
-  { x: 410, y: 450, w: 235, h: 22 },
-  { x: 735, y: 450, w: 170, h: 22 },
-  { x: 160, y: 330, w: 220, h: 22 },
-  { x: 510, y: 330, w: 250, h: 22 },
-  { x: 330, y: 220, w: 300, h: 22 },
-  { x: 55, y: 150, w: 180, h: 22 },
-  { x: 730, y: 150, w: 180, h: 22 }
+  // ground
+  { x: 0, y: 710, w: 1400, h: 40 },
+
+  // lower platforms
+  { x: 80, y: 610, w: 260, h: 22 },
+  { x: 430, y: 610, w: 260, h: 22 },
+  { x: 780, y: 610, w: 260, h: 22 },
+  { x: 1120, y: 610, w: 220, h: 22 },
+
+  // middle platforms
+  { x: 160, y: 490, w: 260, h: 22 },
+  { x: 560, y: 490, w: 300, h: 22 },
+  { x: 1000, y: 490, w: 270, h: 22 },
+
+  // upper middle
+  { x: 60, y: 370, w: 220, h: 22 },
+  { x: 390, y: 370, w: 260, h: 22 },
+  { x: 760, y: 370, w: 260, h: 22 },
+  { x: 1110, y: 370, w: 230, h: 22 },
+
+  // high platforms
+  { x: 210, y: 250, w: 260, h: 22 },
+  { x: 580, y: 250, w: 280, h: 22 },
+  { x: 980, y: 250, w: 260, h: 22 },
+
+  // top platforms
+  { x: 80, y: 140, w: 220, h: 22 },
+  { x: 460, y: 130, w: 260, h: 22 },
+  { x: 850, y: 130, w: 260, h: 22 },
+  { x: 1190, y: 140, w: 170, h: 22 }
 ];
 
 const rooms = new Map();
@@ -35,10 +57,10 @@ const rooms = new Map();
 const colors = ["#2196f3", "#ff3b30", "#ffd60a", "#af52de"];
 
 const spawns = [
-  { x: 120, y: 515 },
-  { x: 800, y: 515 },
-  { x: 205, y: 285 },
-  { x: 710, y: 285 }
+  { x: 120, y: 660 },
+  { x: 1230, y: 660 },
+  { x: 250, y: 440 },
+  { x: 1060, y: 440 }
 ];
 
 function makeCode() {
@@ -59,6 +81,9 @@ function publicRoom(r) {
     time: Math.max(0, Math.ceil(r.time)),
     taggerId: r.taggerId,
     players: r.players,
+    platforms,
+    mapW: W,
+    mapH: H,
     message: r.message
   };
 }
@@ -80,7 +105,7 @@ function newPlayer(id, name) {
     jump: false,
     ground: false,
 
-    // Double jump
+    // DOUBLE JUMP
     jumpsUsed: 0,
     maxJumps: 2,
 
@@ -154,7 +179,7 @@ function startRoom(r) {
   resetPositions(r);
 
   r.started = true;
-  r.time = 90;
+  r.time = 120;
   r.lastTag = 0;
   r.message = "";
   r.taggerId = ids[Math.floor(Math.random() * ids.length)];
@@ -169,7 +194,7 @@ io.on("connection", (socket) => {
       code: c,
       host: socket.id,
       started: false,
-      time: 90,
+      time: 120,
       taggerId: 1,
       last: Date.now(),
       lastTag: 0,
@@ -253,7 +278,7 @@ io.on("connection", (socket) => {
     if (r.host !== socket.id) return;
 
     r.started = false;
-    r.time = 90;
+    r.time = 120;
     r.message = "";
 
     resetPositions(r);
@@ -279,7 +304,7 @@ io.on("connection", (socket) => {
 
     if (key === "jump") {
       if (down && !p.jump && p.jumpsUsed < p.maxJumps) {
-        p.vy = -610;
+        p.vy = -650;
         p.ground = false;
         p.jumpsUsed++;
       }
@@ -345,7 +370,7 @@ setInterval(() => {
     }
 
     for (const p of Object.values(r.players)) {
-      const speed = p.id === r.taggerId ? 250 : 230;
+      const speed = p.id === r.taggerId ? 285 : 260;
 
       if (p.left && !p.right) {
         p.vx = -speed;
@@ -355,7 +380,7 @@ setInterval(() => {
         p.vx = 0;
       }
 
-      p.vy += 1750 * dt;
+      p.vy += 1800 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
 
@@ -369,7 +394,7 @@ setInterval(() => {
         p.x = W - p.w;
       }
 
-      if (p.y > H + 100) {
+      if (p.y > H + 150) {
         const s = spawns[p.id - 1];
 
         p.x = s.x;
